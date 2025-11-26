@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Generator Redaksi Taksiran</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-container">
+  <h1>Generator Redaksi Taksiran</h1>
+  <p class="subtitle">
+    Isi data barang, lalu klik <b>＋ Tambah Redaksi</b> untuk membuat kalimat keterangan pengujian.
+  </p>
+  <hr>
+
+  <div class="grid">
+    <!-- ============ KIRI: FORM ============ -->
+    <div class="left-column">
+      <h2>Input Data Barang</h2>
+
+      <!-- Data Umum -->
+      <div class="section-title"><span></span>Data Umum</div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label for="noUrut">No. Urut:</label>
+          <input type="text" id="noUrut" placeholder="mis. 1">
+        </div>
+
+        <div class="form-row">
+          <label for="jumlahBarang">Jumlah barang (huruf):</label>
+          <select id="jumlahBarang">
+            <option value="satu">satu</option>
+            <option value="sepasang">sepasang</option>
+            <option value="dua">dua</option>
+            <option value="tiga">tiga</option>
+            <option value="empat">empat</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="barang">Jenis Barang:</label>
+          <select id="barang">
+            <option value="cincin">cincin</option>
+            <option value="kalung">kalung</option>
+            <option value="gelang">gelang</option>
+            <option value="liontin">liontin</option>
+            <option value="anting">anting</option>
+            <option value="bros">bros</option>
+            <option value="set perhiasan">set perhiasan</option>
+            <option value="emas batangan">emas batangan</option>
+            <option value="batu">batu (lepasan)</option>
+            <option value="lainnya">Lainnya...</option>
+          </select>
+        </div>
+
+        <div class="form-row" id="rowBarangCustom" style="display:none;">
+          <label for="barangCustom">Jenis barang (lainnya):</label>
+          <input type="text" id="barangCustom" placeholder="mis. gelang kaki, chain, dsb.">
+        </div>
+
+        <div class="form-row">
+          <label for="karat">Kadar emas:</label>
+          <select id="karat">
+            <option value="Diluar SNI">Diluar SNI / bukan emas</option>
+            <option value="8">8 karat</option>
+            <option value="9">9 karat</option>
+            <option value="10">10 karat</option>
+            <option value="11">11 karat</option>
+            <option value="12">12 karat</option>
+            <option value="13">13 karat</option>
+            <option value="14">14 karat</option>
+            <option value="15">15 karat</option>
+            <option value="16">16 karat</option>
+            <option value="17">17 karat</option>
+            <option value="18">18 karat</option>
+            <option value="19">19 karat</option>
+            <option value="20">20 karat</option>
+            <option value="21">21 karat</option>
+            <option value="22">22 karat</option>
+            <option value="23">23 karat</option>
+            <option value="24">24 karat</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="berat">Berat (g / carat*):</label>
+          <input type="number" step="0.01" id="berat" value="">
+        </div>
+      </div>
+      <p class="note">Jika barang = <b>batu</b>, berat dianggap dalam satuan <b>carat</b>.</p>
+
+      <!-- Berlian -->
+      <div class="section-title"><span></span>Berlian</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="adaBerlian" checked>
+        <label for="adaBerlian">Ada berlian?</label>
+      </div>
+      <div class="form-row">
+        <label for="jmlBerlian">Jml Berlian:</label>
+        <input type="number" id="jmlBerlian" value="" min="0">
+        <label for="jenisBerlian">Jenis berlian:</label>
+        <select id="jenisBerlian">
+          <option value="asli">Berlian (asli)</option>
+          <option value="bukan">Bukan berlian</option>
+        </select>
+      </div>
+
+      <!-- Batu Bermata -->
+      <div class="section-title"><span></span>Batu</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="adaBatu">
+        <label for="adaBatu">Ada batu bermata (pada perhiasan)?</label>
+      </div>
+
+      <div class="batu-row">
+        <div>
+          <label for="batu1_jml">Jml Batu 1:</label>
+          <input type="number" id="batu1_jml" min="0" step="1">
+        </div>
+        <div>
+          <label for="batu1_jenis">Jenis Batu 1:</label>
+          <input type="text" id="batu1_jenis" placeholder="mis. Natural Ruby">
+        </div>
+      </div>
+
+      <div class="batu-row">
+        <div>
+          <label for="batu2_jml">Jml Batu 2:</label>
+          <input type="number" id="batu2_jml" min="0" step="1">
+        </div>
+        <div>
+          <label for="batu2_jenis">Jenis Batu 2:</label>
+          <input type="text" id="batu2_jenis" placeholder="opsional">
+        </div>
+      </div>
+
+      <div class="batu-row">
+        <div>
+          <label for="batu3_jml">Jml Batu 3:</label>
+          <input type="number" id="batu3_jml" min="0" step="1">
+        </div>
+        <div>
+          <label for="batu3_jenis">Jenis Batu 3:</label>
+          <input type="text" id="batu3_jenis" placeholder="opsional">
+        </div>
+      </div>
+
+      <p class="note">
+        Untuk <b>batu lepasan</b>, gunakan jenis barang = <b>"batu"</b> dan isi jenis batu pada kolom Batu 1.
+      </p>
+
+      <!-- Emas Batangan -->
+      <div class="section-title"><span></span>Khusus Emas Batangan</div>
+      <div class="form-row">
+        <label for="merkEmas">Merk Emas:</label>
+        <input type="text" id="merkEmas" placeholder="mis. ANTAM, UBS, dll.">
+      </div>
+      <div class="form-row">
+        <label for="noSeriEmas">No. Seri:</label>
+        <input type="text" id="noSeriEmas" placeholder="mis. A1234567">
+      </div>
+
+      <!-- Harga & Import -->
+      <div class="section-title"><span></span>Nilai Taksiran & Import CSV</div>
+      <div class="form-row">
+        <label for="harga">Harga (Rp):</label>
+        <input type="number" id="harga" value="" min="0">
+      </div>
+
+      <div id="buttonRow">
+        <button id="addBtn">＋ Tambah Redaksi</button>
+        <button id="downloadBtn">⬇ Download TXT</button>
+
+        <input type="file" id="csvInput" accept=".csv">
+        <button id="importBtn">⇪ Import CSV</button>
+        <span class="file-label">Header fleksibel: NoUrut, Jumlah, Barang, Karat, Berat, dll.</span>
+      </div>
+    </div>
+
+    <!-- ============ KANAN: OUTPUT ============ -->
+    <div class="right-column">
+      <h2>Hasil Redaksi</h2>
+      <div id="outputWrapper">
+        <table id="outputTable">
+          <thead>
+          <tr>
+            <th style="width:60px;">No.</th>
+            <th>Redaksi</th>
+            <th style="width:120px; text-align:right;">Aksi</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
