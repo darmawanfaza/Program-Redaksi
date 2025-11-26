@@ -1,8 +1,8 @@
-const entries = [];
-const addBtn = document.getElementById("addBtn");
-const addBtnDefaultText = addBtn.textContent;
-let editIndex = null;
+// ====== DATA PENYIMPAN ======
+const entries = []; // { noUrut, redaksi, segments, data }
+const STORAGE_KEY = "redaksiEntries_v2";
 
+// ====== FUNGSI BANTU UMUM ======
 function terbilang(n) {
   n = Math.floor(Number(n) || 0);
   if (n === 0) return "nol";
@@ -42,44 +42,63 @@ function terbilang(n) {
       const sisa = x % 1_000_000_000;
       return _tb(miliar) + " miliar" + (sisa ? " " + _tb(sisa) : "");
     }
-    if (x < 1_000_000_000_000_000) {
-      const triliun = Math.floor(x / 1_000_000_000_000);
-      const sisa = x % 1_000_000_000_000;
-      return _tb(triliun) + " triliun" + (sisa ? " " + _tb(sisa) : "");
-    }
-    return "";
+    const triliun = Math.floor(x / 1_000_000_000_000);
+    const sisa = x % 1_000_000_000_000;
+    return _tb(triliun) + " triliun" + (sisa ? " " + _tb(sisa) : "");
   }
+
   return _tb(n).trim();
 }
 
-function formatBerat2(berat) {
-  if (typeof berat !== "number" || isNaN(berat)) return "0,00";
-  return berat.toLocaleString("id-ID", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+function toTitleCase(str) {
+  return (str || "").toLowerCase().split(/\s+/).filter(Boolean).map(w =>
+    w.charAt(0).toUpperCase() + w.slice(1)
+  ).join(" ");
 }
 
-function toTitleCase(str) {
-  return String(str || "")
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+function formatBerat2(berat) {
+  const num = Number(berat) || 0;
+  return num.toFixed(2).replace(".", ",");
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;");
 }
 
 function segmentsToHtml(segments) {
-  return segments.map(seg => {
-    const safe = seg.text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-    return seg.italic ? "<em>" + safe + "</em>" : safe;
-  }).join("");
+  let html = "";
+  segments.forEach(seg => {
+    const safe = escapeHtml(seg.text).replace(/\n/g, "<br>");
+    if (seg.italic) {
+      html += "<i>" + safe + "</i>";
+    } else {
+      html += safe;
+    }
+  });
+  return html;
 }
 
-// --------- Builder Perhiasan Umum -----------
+function clearErrors() {
+  document.querySelectorAll(".input-error").forEach(el => {
+    el.classList.remove("input-error");
+  });
+  document.querySelectorAll(".error-text").forEach(el => {
+    el.style.display = "none";
+    el.textContent = "";
+  });
+}
+
+function setError(inputEl, errorEl, message) {
+  if (inputEl) inputEl.classList.add("input-error");
+  if (errorEl) {
+    errorEl.textContent = message;
+    errorEl.style.display = "block";
+  }
+}
+
+// ====== BUILDER PERHIASAN ======
 function buildRedaksiPerhiasanSegments({
   jumlahWordRaw,
   namaBarang,
@@ -111,31 +130,29 @@ function buildRedaksiPerhiasanSegments({
   const matItems = [];
 
   // Berlian
-  if (jumlahBerlian && jumlahBerlian > 0) {
-    const jwNum = String(jumlahBerlian);
-    const jwWords = terbilang(jumlahBerlian);
-    const jenis = berlianAsli ? "berlian" : "bukan berlian";
-
+  if (jumlahBerlian > 0) {
+    const jw = terbilang(jumlahBerlian);
     matItems.push([
-      { text: " " + jwNum + " ", italic: false },
-      { text: "(" + jwWords + ")", italic: true },
-      { text: " butir ", italic: false },
-      { text: jenis, italic: false }
+      { text: " " + jumlahBerlian + " ", italic: false },
+      { text: "(", italic: false },
+      { text: jw, italic: true },        // terbilang italic
+      { text: ") butir ", italic: false },
+      { text: berlianAsli ? "berlian" : "bukan berlian", italic: false } // "berlian" tidak italic
     ]);
   }
 
-  // Batu lain
-  (stones || []).forEach(stone => {
-    const j = stone.jumlah || 0;
-    const jenis = (stone.jenis || "").trim();
-    if (j > 0 && jenis) {
-      const jwNum = String(j);
-      const jwWords = terbilang(j);
+  // Batu: tanpa kata "batu"
+  (stones || []).forEach(batu => {
+    const jml = Number(batu.jumlah || 0);
+    const jenis = (batu.jenis || "").trim();
+    if (jml > 0 && jenis) {
+      const jw = terbilang(jml);
       matItems.push([
-        { text: " " + jwNum + " ", italic: false },
-        { text: "(" + jwWords + ")", italic: true },
-        { text: " butir ", italic: false },
-        { text: toTitleCase(jenis), italic: true }
+        { text: " " + jml + " ", italic: false },
+        { text: "(", italic: false },
+        { text: jw, italic: true },     // terbilang italic
+        { text: ") butir ", italic: false },
+        { text: toTitleCase(jenis), italic: true } // nama batu italic
       ]);
     }
   });
@@ -173,30 +190,28 @@ function buildRedaksiPerhiasanSegments({
     segments.push({ text: ", ", italic: false });
     segments.push({ text: "tidak dilakukan penaksiran harga", italic: false });
     segments.push({ text: ".", italic: false });
-    return segments;
+  } else {
+    const hargaFmt = harga.toLocaleString("id-ID");
+    const hargaWords = terbilang(harga) + " rupiah";
+
+    segments.push({ text: " ", italic: false });
+    if (objekBernilai === 1) {
+      segments.push({ text: "dengan taksiran harga Rp", italic: false });
+    } else {
+      segments.push({ text: "dengan total taksiran harga Rp", italic: false });
+    }
+    segments.push({ text: hargaFmt, italic: false });
+    segments.push({ text: ",- ", italic: false });
+    segments.push({ text: "(", italic: false });
+    segments.push({ text: hargaWords, italic: true }); // terbilang rupiah italic
+    segments.push({ text: ")", italic: false });
+    segments.push({ text: ".", italic: false });
   }
-
-  const hargaFmt = harga.toLocaleString("id-ID");
-  const hargaWords = terbilang(harga) + " rupiah";
-
-  segments.push({ text: " ", italic: false });
-  segments.push({
-    text: objekBernilai === 1
-      ? "dengan taksiran harga Rp"
-      : "dengan total taksiran harga Rp",
-    italic: false
-  });
-  segments.push({ text: hargaFmt, italic: false });
-  segments.push({ text: ",- ", italic: false });
-  segments.push({ text: "(", italic: false });
-  segments.push({ text: hargaWords, italic: true });
-  segments.push({ text: ")", italic: false });
-  segments.push({ text: ".", italic: false });
 
   return segments;
 }
 
-// --------- Builder Emas Batangan ----------
+// ====== BUILDER EMAS BATANGAN ======
 function buildRedaksiEmasBatanganSegments({
   jumlahWordRaw,
   merk,
@@ -210,9 +225,22 @@ function buildRedaksiEmasBatanganSegments({
   const jword = (jumlahWordRaw || "satu").toLowerCase();
   const jwordCap = jword.charAt(0).toUpperCase() + jword.slice(1);
 
-  segments.push({ text: jwordCap + " emas batangan ", italic: false });
-  segments.push({ text: "“" + (merk || "").trim() + "” ", italic: false });
-  segments.push({ text: "dengan nomor seri " + (noSeri || "").trim() + " ", italic: false });
+  segments.push({ text: jwordCap + " ", italic: false });
+  segments.push({ text: "emas batangan ", italic: false });
+
+  merk = (merk || "").trim();
+  noSeri = (noSeri || "").trim();
+
+  if (merk) {
+    segments.push({ text: "“", italic: false });
+    segments.push({ text: merk, italic: false });
+    segments.push({ text: "” ", italic: false });
+  }
+
+  if (noSeri) {
+    segments.push({ text: "dengan nomor seri ", italic: false });
+    segments.push({ text: noSeri + " ", italic: false });
+  }
 
   if (isEmas) {
     segments.push({ text: "ditaksir emas ", italic: false });
@@ -225,6 +253,7 @@ function buildRedaksiEmasBatanganSegments({
   segments.push({ text: "berat " + beratStr + " gram", italic: false });
 
   harga = Number(harga || 0);
+
   if (harga === 0) {
     segments.push({ text: ", ", italic: false });
     segments.push({ text: "tidak dilakukan penaksiran harga", italic: false });
@@ -246,7 +275,7 @@ function buildRedaksiEmasBatanganSegments({
   return segments;
 }
 
-// --------- Builder Batu Lepasan ----------
+// ====== BUILDER BATU LEPASAN ======
 function buildRedaksiBatuLepasSegments({
   jumlahWordRaw,
   jenisBatu,
@@ -286,7 +315,7 @@ function buildRedaksiBatuLepasSegments({
   return segments;
 }
 
-// --------- Render Tabel ----------
+// ====== RENDER TABEL HASIL ======
 function renderTable() {
   const tbody = document.querySelector("#outputTable tbody");
   tbody.innerHTML = "";
@@ -303,6 +332,7 @@ function renderTable() {
     const tdAksi = document.createElement("td");
     tdAksi.className = "col-aksi";
 
+    // tombol Salin
     const copyBtn = document.createElement("button");
     copyBtn.textContent = "Salin";
     copyBtn.className = "btn-copy";
@@ -310,22 +340,22 @@ function renderTable() {
       navigator.clipboard.writeText(e.redaksi).then(() => {
         copyBtn.textContent = "✅ Disalin!";
         setTimeout(() => (copyBtn.textContent = "Salin"), 1200);
+      }).catch(() => {
+        alert("Gagal menyalin ke clipboard. Coba pakai Ctrl+C manual.");
       });
     });
     tdAksi.appendChild(copyBtn);
 
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit";
-    editBtn.className = "btn-edit";
-    editBtn.addEventListener("click", () => loadFormFromEntry(idx));
-    tdAksi.appendChild(editBtn);
-
+    // tombol Hapus
     const delBtn = document.createElement("button");
     delBtn.textContent = "Hapus";
     delBtn.className = "btn-delete";
     delBtn.addEventListener("click", () => {
       entries.splice(idx, 1);
       renderTable();
+      saveToStorage();
+      updateDashboard();
+      renderHistory();
     });
     tdAksi.appendChild(delBtn);
 
@@ -336,16 +366,88 @@ function renderTable() {
   });
 }
 
-// --------- Tambah / Edit dari Form ----------
+// ====== LOCALSTORAGE: SIMPAN & MUAT ======
+function saveToStorage() {
+  const plain = entries.map(e => ({
+    noUrut: e.noUrut,
+    redaksi: e.redaksi,
+    data: e.data || {}
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(plain));
+}
+
+function loadFromStorage() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const arr = JSON.parse(raw);
+    arr.forEach(item => {
+      const seg = [{ text: item.redaksi, italic: false }];
+      entries.push({
+        noUrut: item.noUrut,
+        redaksi: item.redaksi,
+        segments: seg,
+        data: item.data || {}
+      });
+    });
+    renderTable();
+    updateDashboard();
+    renderHistory();
+  } catch (e) {
+    console.error("Gagal parse storage:", e);
+  }
+}
+
+// ====== DASHBOARD & RIWAYAT ======
+function updateDashboard() {
+  const total = entries.length;
+  let totalHarga = 0;
+  let countEmasBatangan = 0;
+  let countBatuLepas = 0;
+
+  entries.forEach(e => {
+    const d = e.data || {};
+    const h = Number(d.harga || 0);
+    if (!isNaN(h)) totalHarga += h;
+    const barang = (d.barang || "").toLowerCase();
+    if (barang === "emas batangan") countEmasBatangan++;
+    if (barang === "batu") countBatuLepas++;
+  });
+
+  document.getElementById("dashTotal").textContent = total;
+  document.getElementById("dashTotalHarga").textContent = totalHarga.toLocaleString("id-ID");
+  document.getElementById("dashEmasBatangan").textContent = countEmasBatangan;
+  document.getElementById("dashBatuLepas").textContent = countBatuLepas;
+}
+
+function renderHistory() {
+  const tbody = document.getElementById("historyTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  entries.forEach(e => {
+    const d = e.data || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${e.noUrut}</td>
+      <td>${d.namaBarangFinal || d.barang || "-"}</td>
+      <td style="text-align:right;">${Number(d.harga || 0).toLocaleString("id-ID")}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ====== TAMBAH DARI FORM ======
 function addEntryFromForm() {
+  clearErrors();
+
   const noUrut = (document.getElementById("noUrut").value || "").trim() || "-";
-  const jumlahWordRaw = (document.getElementById("jumlahBarang").value || "satu").trim().toLowerCase();
-  const barang = (document.getElementById("barang").value || "").trim().toLowerCase();
+  const jumlahWordRaw = document.getElementById("jumlahBarang").value;
+  const barang = document.getElementById("barang").value;
   const barangCustom = (document.getElementById("barangCustom").value || "").trim();
 
-  const karatVal = (document.getElementById("karat").value || "").trim();
+  const karatVal = document.getElementById("karat").value;
   const isEmas = (karatVal !== "Diluar SNI");
-  const karatInt = isEmas ? parseInt(karatVal || "0", 10) : 0;
+  const karatInt = isEmas ? parseInt(karatVal, 10) : 0;
 
   let berat = parseFloat(String(document.getElementById("berat").value).replace(",", "."));
   if (isNaN(berat)) berat = 0;
@@ -377,33 +479,54 @@ function addEntryFromForm() {
 
   const merkEmas = (document.getElementById("merkEmas").value || "").trim();
   const noSeriEmas = (document.getElementById("noSeriEmas").value || "").trim();
-  const harga = parseInt(document.getElementById("harga").value || "0", 10) || 0;
+  const harga = parseInt(document.getElementById("harga").value || "0", 10);
   const jenisBatuLepas = (document.getElementById("batu1_jenis").value || "").trim();
 
-  // Validasi
+  const beratInput = document.getElementById("berat");
+  const hargaInput = document.getElementById("harga");
+  const hargaErrorEl = document.getElementById("hargaError");
+
+  // ====== Validasi kontekstual ======
   if (barang === "lainnya" && !barangCustom) {
     alert("Untuk opsi 'Lainnya', isi jenis barang pada kolom yang tersedia.");
+    setError(document.getElementById("barangCustom"), null, "");
     return;
   }
+
   if (berat <= 0) {
+    setError(beratInput, null, "Berat harus lebih besar dari 0.");
     alert("Berat harus lebih besar dari 0.");
     return;
   }
+
   if (barang === "emas batangan" && (!merkEmas || !noSeriEmas)) {
+    setError(document.getElementById("merkEmas"), null, "");
+    setError(document.getElementById("noSeriEmas"), null, "");
     alert("Untuk emas batangan, isi Merk Emas dan Nomor Seri terlebih dahulu.");
     return;
   }
+
   if (barang === "batu" && !jenisBatuLepas) {
+    setError(document.getElementById("batu1_jenis"), null, "Jenis batu wajib diisi untuk batu lepasan.");
     alert("Untuk batu lepasan, isi jenis batu pada kolom Batu 1.");
     return;
   }
+
   if (adaBerlian && jumlahBerlian <= 0) {
+    setError(document.getElementById("jmlBerlian"), null, "Jumlah berlian harus > 0 jika ada berlian.");
     alert("Jika ada berlian, jumlah berlian harus lebih besar dari 0.");
     return;
   }
+
   if (adaBatu && stones.length === 0 && barang !== "batu") {
     alert("Checkbox batu dicentang, tetapi belum ada data batu yang diisi.");
     return;
+  }
+
+  if (harga === 0 && isEmas) {
+    setError(hargaInput, hargaErrorEl,
+      "Emas dengan kadar valid biasanya diberi nilai taksiran. Yakin nilai 0?");
+    // Tidak di-return, hanya warning visual.
   }
 
   const namaBarangFinal = (barang === "lainnya" && barangCustom)
@@ -411,6 +534,7 @@ function addEntryFromForm() {
     : barang;
 
   let segments;
+
   if (barang === "emas batangan") {
     segments = buildRedaksiEmasBatanganSegments({
       jumlahWordRaw,
@@ -465,86 +589,20 @@ function addEntryFromForm() {
     jenisBatuLepas
   };
 
-  if (editIndex !== null) {
-    entries[editIndex] = { noUrut, redaksi: redaksiText, segments, data };
-    editIndex = null;
-    addBtn.textContent = addBtnDefaultText;
-  } else {
-    entries.push({ noUrut, redaksi: redaksiText, segments, data });
-  }
-
+  entries.push({ noUrut, redaksi: redaksiText, segments, data });
   renderTable();
+  saveToStorage();
+  updateDashboard();
+  renderHistory();
 }
 
-addBtn.addEventListener("click", addEntryFromForm);
+document.getElementById("addBtn").addEventListener("click", addEntryFromForm);
 
-function loadFormFromEntry(index) {
-  const entry = entries[index];
-  if (!entry || !entry.data) {
-    alert("Data asli untuk baris ini tidak tersedia untuk diedit.");
-    return;
-  }
-  const d = entry.data;
-  editIndex = index;
-  addBtn.textContent = "Simpan Perubahan";
-
-  document.getElementById("noUrut").value = d.noUrut && d.noUrut !== "-" ? d.noUrut : "";
-  document.getElementById("jumlahBarang").value = d.jumlahWordRaw || "satu";
-
-  const barangSelectEl = document.getElementById("barang");
-  const barangCustomEl = document.getElementById("barangCustom");
-  const rowBarangCustomEl = document.getElementById("rowBarangCustom");
-
-  if (d.barang === "lainnya") {
-    barangSelectEl.value = "lainnya";
-    rowBarangCustomEl.style.display = "flex";
-    barangCustomEl.value = d.barangCustom || d.namaBarangFinal || "";
-  } else {
-    barangSelectEl.value = d.barang || "cincin";
-    rowBarangCustomEl.style.display = "none";
-    barangCustomEl.value = "";
-  }
-
-  const karatEl = document.getElementById("karat");
-  if (!d.isEmas) {
-    karatEl.value = "Diluar SNI";
-  } else {
-    karatEl.value = String(d.karatInt || d.karatVal || "24");
-  }
-
-  document.getElementById("berat").value =
-    typeof d.berat === "number" ? String(d.berat) : "";
-
-  document.getElementById("adaBerlian").checked = !!d.adaBerlian;
-  document.getElementById("jmlBerlian").value =
-    d.jumlahBerlian != null ? d.jumlahBerlian : "";
-  document.getElementById("jenisBerlian").value = d.berlianAsli ? "asli" : "bukan";
-
-  document.getElementById("adaBatu").checked = !!d.adaBatu;
-  const stones = d.stones || [];
-  const s1 = stones[0] || {};
-  const s2 = stones[1] || {};
-  const s3 = stones[2] || {};
-
-  document.getElementById("batu1_jml").value = s1.jumlah != null ? s1.jumlah : "";
-  document.getElementById("batu1_jenis").value = s1.jenis || "";
-  document.getElementById("batu2_jml").value = s2.jumlah != null ? s2.jumlah : "";
-  document.getElementById("batu2_jenis").value = s2.jenis || "";
-  document.getElementById("batu3_jml").value = s3.jumlah != null ? s3.jumlah : "";
-  document.getElementById("batu3_jenis").value = s3.jenis || "";
-
-  if (d.barang === "batu" && d.jenisBatuLepas) {
-    document.getElementById("batu1_jenis").value = d.jenisBatuLepas;
-  }
-
-  document.getElementById("merkEmas").value = d.merkEmas || "";
-  document.getElementById("noSeriEmas").value = d.noSeriEmas || "";
-  document.getElementById("harga").value = d.harga != null ? d.harga : "";
-}
-
+// ====== SHOW/HIDE BARANG CUSTOM UNTUK "LAINNYA" ======
 const barangSelect = document.getElementById("barang");
 const rowBarangCustom = document.getElementById("rowBarangCustom");
 const barangCustomInput = document.getElementById("barangCustom");
+
 barangSelect.addEventListener("change", () => {
   if (barangSelect.value === "lainnya") {
     rowBarangCustom.style.display = "flex";
@@ -554,7 +612,7 @@ barangSelect.addEventListener("change", () => {
   }
 });
 
-// ---------- CSV IMPORT ----------
+// ====== IMPORT CSV ======
 document.getElementById("importBtn").addEventListener("click", function () {
   const fileInput = document.getElementById("csvInput");
   const file = fileInput.files && fileInput.files[0];
@@ -563,7 +621,10 @@ document.getElementById("importBtn").addEventListener("click", function () {
     return;
   }
   const reader = new FileReader();
-  reader.onload = e => importFromCsv(e.target.result);
+  reader.onload = function (e) {
+    const text = e.target.result;
+    importFromCsv(text);
+  };
   reader.readAsText(file, "utf-8");
 });
 
@@ -571,22 +632,24 @@ function detectDelimiter(line) {
   const candidates = [",", ";", "\t"];
   let bestDelim = ",";
   let bestCount = 0;
-  for (const delim of candidates) {
-    const count = line.split(delim).length;
-    if (count > bestCount) {
-      bestCount = count;
-      bestDelim = delim;
+  candidates.forEach(d => {
+    const c = line.split(d).length;
+    if (c > bestCount) {
+      bestCount = c;
+      bestDelim = d;
     }
-  }
+  });
   return bestDelim;
 }
 
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-  if (!lines.length) return [];
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length === 0) return [];
   const delim = detectDelimiter(lines[0]);
   return lines.map(line =>
-    line.split(delim).map(cell => cell.replace(/^"|"$/g, "").trim())
+    line.split(delim).map(cell =>
+      cell.replace(/^"|"$/g, "").trim()
+    )
   );
 }
 
@@ -603,75 +666,41 @@ function importFromCsv(csvText) {
     return;
   }
 
-  const header = rows[0].map(h => String(h || "").trim().toLowerCase());
-
-  const idxMap = {
-    nourut: header.indexOf("nourut"),
-    jumlah: header.indexOf("jumlah"),
-    barang: header.indexOf("barang"),
-    karat: header.indexOf("karat"),
-    berat: header.indexOf("berat"),
-    adaberlian: header.indexOf("adaberlian"),
-    jmlberlian: header.indexOf("jmlberlian"),
-    jenisberlian: header.indexOf("jenisberlian"),
-    adabatu: header.indexOf("adabatu"),
-    batu1jml: header.indexOf("batu1jml"),
-    batu1jenis: header.indexOf("batu1jenis"),
-    batu2jml: header.indexOf("batu2jml"),
-    batu2jenis: header.indexOf("batu2jenis"),
-    batu3jml: header.indexOf("batu3jml"),
-    batu3jenis: header.indexOf("batu3jenis"),
-    merkemas: header.indexOf("merkemas"),
-    noseriemas: header.indexOf("noseriemas"),
-    harga: header.indexOf("harga")
-  };
-
-  const missingRequired = [];
-  if (idxMap.jumlah === -1) missingRequired.push("Jumlah");
-  if (idxMap.barang === -1) missingRequired.push("Barang");
-  if (idxMap.berat === -1) missingRequired.push("Berat");
-
-  if (missingRequired.length > 0) {
-    alert("Header CSV tidak lengkap. Kolom wajib berikut tidak ditemukan: " + missingRequired.join(", "));
-    return;
-  }
-
-  function getVal(row, key, defaultVal = "") {
-    const idx = idxMap[key];
-    if (idx === -1 || idx >= row.length) return defaultVal;
-    return row[idx];
-  }
-
   let imported = 0;
 
+  // baris 0 = header
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i];
-    if (!cols || cols.length === 0) continue;
+    if (cols.length < 18) continue;
 
-    let noUrut = (getVal(cols, "nourut", "") || "").trim() || "-";
-    let jumlahWordRaw = (getVal(cols, "jumlah", "satu") || "satu").trim().toLowerCase();
-    let barang = (getVal(cols, "barang", "cincin") || "cincin").trim().toLowerCase();
+    let [
+      noUrut,
+      jumlahWordRaw,
+      barang,
+      karatVal,
+      beratStr,
+      adaBerlianStr,
+      jmlBerlianStr,
+      jenisBerlianStr,
+      adaBatuStr,
+      b1jStr,
+      b1t,
+      b2jStr,
+      b2t,
+      b3jStr,
+      b3t,
+      merkEmas,
+      noSeriEmas,
+      hargaStr
+    ] = cols;
 
-    const karatVal = (getVal(cols, "karat", "") || "").trim();
+    noUrut = (noUrut || "").trim() || "-";
+    jumlahWordRaw = (jumlahWordRaw || "satu").trim().toLowerCase();
+    barang = (barang || "cincin").trim().toLowerCase();
+
     const isEmas = (karatVal !== "Diluar SNI");
     const karatInt = isEmas ? parseInt(karatVal || "0", 10) : 0;
-
-    const beratStr = getVal(cols, "berat", "0");
     const berat = parseFloat((beratStr || "0").replace(",", ".")) || 0;
-
-    const adaBerlianStr = getVal(cols, "adaberlian", "");
-    const jmlBerlianStr = getVal(cols, "jmlberlian", "0");
-    const jenisBerlianStr = getVal(cols, "jenisberlian", "");
-    const adaBatuStr = getVal(cols, "adabatu", "");
-    const b1jStr = getVal(cols, "batu1jml", "0");
-    const b1t = getVal(cols, "batu1jenis", "");
-    const b2jStr = getVal(cols, "batu2jml", "0");
-    const b2t = getVal(cols, "batu2jenis", "");
-    const b3jStr = getVal(cols, "batu3jml", "0");
-    const b3t = getVal(cols, "batu3jenis", "");
-    const merkEmas = getVal(cols, "merkemas", "");
-    const noSeriEmas = getVal(cols, "noseriemas", "");
-    const hargaStr = getVal(cols, "harga", "0");
 
     const adaBerlian = isTrueLike(adaBerlianStr);
     let jumlahBerlian = 0;
@@ -697,10 +726,12 @@ function importFromCsv(csvText) {
       if (b3j > 0 && batu3jenis) stones.push({ jumlah: b3j, jenis: batu3jenis });
     }
 
-    const harga = parseInt(hargaStr || "0", 10) || 0;
+    const harga = parseInt(hargaStr || "0", 10);
     const jenisBatuLepas = (b1t || "").trim();
 
     let segments;
+    let namaBarangFinal = barang;
+
     if (barang === "emas batangan") {
       segments = buildRedaksiEmasBatanganSegments({
         jumlahWordRaw,
@@ -719,7 +750,6 @@ function importFromCsv(csvText) {
         harga
       });
     } else {
-      const namaBarangFinal = barang;
       segments = buildRedaksiPerhiasanSegments({
         jumlahWordRaw,
         namaBarang: namaBarangFinal,
@@ -740,7 +770,7 @@ function importFromCsv(csvText) {
       jumlahWordRaw,
       barang,
       barangCustom: "",
-      namaBarangFinal: barang,
+      namaBarangFinal,
       karatVal,
       isEmas,
       karatInt,
@@ -760,24 +790,29 @@ function importFromCsv(csvText) {
     imported++;
   }
 
-  alert(
-    imported === 0
-      ? "CSV terbaca, tetapi tidak ada baris valid yang diimpor."
-      : "Berhasil mengimpor " + imported + " baris dari CSV."
-  );
   renderTable();
+  saveToStorage();
+  updateDashboard();
+  renderHistory();
+
+  if (imported === 0) {
+    alert("CSV terbaca, tetapi tidak ada baris valid yang diimport.\nPeriksa kembali urutan kolom dan delimiter (koma / titik koma).");
+  } else {
+    alert("Berhasil mengimport " + imported + " baris dari CSV.");
+  }
 }
 
-// ---------- DOWNLOAD TXT ----------
+// ====== DOWNLOAD TXT ======
 document.getElementById("downloadBtn").addEventListener("click", function () {
   if (entries.length === 0) {
     alert("Belum ada redaksi yang dibuat.");
     return;
   }
-  let content = "NoUrut\tRedaksi\r\n";
+
+  let content = "NoUrut\tRedaksi\n";
   entries.forEach(e => {
     const safeRedaksi = e.redaksi.replace(/\s+/g, " ").trim();
-    content += e.noUrut + "\t" + safeRedaksi + "\r\n";
+    content += e.noUrut + "\t" + safeRedaksi + "\n";
   });
 
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -790,3 +825,56 @@ document.getElementById("downloadBtn").addEventListener("click", function () {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 });
+
+// ====== DOWNLOAD WORD (.DOC) ======
+document.getElementById("downloadDocBtn").addEventListener("click", function () {
+  if (entries.length === 0) {
+    alert("Belum ada redaksi yang dibuat.");
+    return;
+  }
+
+  let html = `
+  <html xmlns:o="urn:schemas-microsoft-com:office:office"
+        xmlns:w="urn:schemas-microsoft-com:office:word"
+        xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><title>Redaksi Taksiran</title></head>
+  <body>
+    <h2 style="font-family:Calibri;">Daftar Redaksi Taksiran</h2>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse; font-family:Calibri; font-size:11pt;">
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Redaksi</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  entries.forEach(e => {
+    const htmlRedaksi = segmentsToHtml(e.segments); // mempertahankan italic
+    html += `
+        <tr>
+          <td>${e.noUrut}</td>
+          <td>${htmlRedaksi}</td>
+        </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  </body></html>`;
+
+  const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "redaksi_taksiran.doc";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ====== INIT: MUAT RIWAYAT DARI LOCALSTORAGE ======
+loadFromStorage();
